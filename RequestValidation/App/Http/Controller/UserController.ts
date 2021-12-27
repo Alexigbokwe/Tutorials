@@ -3,6 +3,7 @@ import UserRequest from "App/DTO/User/UserRequest";
 import IUserService from "App/Service/UserService/IUserService";
 import { Request, Response, NextFunction } from "Elucidate/HttpContext";
 import HttpResponse from "Elucidate/HttpContext/ResponseType";
+import UserValidation from "App/Http/Requests/UserValidation";
 
 class UserController {
   protected userService: IUserService;
@@ -41,7 +42,10 @@ class UserController {
    */
   store = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      let user = new UserRequest(req.body);
+      const validate = await UserValidation.validate(req.body);
+      if (!validate.success) return HttpResponse.BAD_REQUEST(res, validate.data);
+
+      let user = new UserRequest(validate.data);
       return await this.userService
         .saveUser(user)
         .then((user) => {
@@ -86,8 +90,12 @@ class UserController {
    */
   update = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      let user_id = Number(req.params["user_id"]);
-      let userData = new UserRequest(req.body);
+      const validate = await Promise.all([await req.validate(req.params, { user_id: "required|string" }), await UserValidation.validate(req.body)]);
+      if (!validate[0].success) return HttpResponse.BAD_REQUEST(res, validate[0].data);
+      if (!validate[1].success) return HttpResponse.BAD_REQUEST(res, validate[1].data);
+
+      let user_id = Number(validate[0].data["user_id"]);
+      let userData = new UserRequest(validate[1].data);
       return await this.userService
         .updateUser(user_id, userData)
         .then((user) => {
